@@ -4,10 +4,11 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.1.0-red.svg)](https://pytorch.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![arXiv](https://img.shields.io/badge/arXiv-2024.xxxxx-b31b1b.svg)](https://arxiv.org/)
+[![Web-LLM](https://img.shields.io/badge/Web--LLM-Enabled-green.svg)](https://mlc.ai/web-llm/)
 
-> **A comprehensive comparative study of YOLOv11 and SSD architectures for real-time traffic sign detection in Bangladesh, achieving 99.45% mAP@50 with unprecedented model efficiency.**
+> **A comprehensive comparative study of YOLOv11 and SSD architectures for real-time traffic sign detection in Bangladesh, achieving 99.45% mAP@50 with unprecedented model efficiency. Now with AI-powered behavior analysis using Web-LLM!**
 
-[📄 Paper](docs/research/RESEARCH_PAPER.pdf) | [📊 Dataset](#dataset) | [🚀 Quick Start](#quick-start) | [💻 Demo](#demo) | [📱 Android App](#android-app)
+[📄 Paper](docs/research/RESEARCH_PAPER.pdf) | [📊 Dataset](#dataset) | [🚀 Quick Start](#quick-start) | [💻 Demo](#demo) | [🤖 Web-LLM](#web-llm-integration) | [📱 Android App](#android-app)
 
 ---
 
@@ -24,6 +25,7 @@
 - 🥇 **Rank #1** in model efficiency - 97% smaller than average
 - 🚀 **Real-time on CPU** - 22.2 FPS without GPU acceleration  
 - 🌍 **First comprehensive BD dataset** - 8,953 images, 29 classes
+- 🤖 **AI-Powered Analysis** - Web-LLM for user behavior insights
 - 📱 **Production-ready** - Android app + Web demo
 
 ---
@@ -154,6 +156,49 @@ python evaluate_models.py \
   --test-labels ../data/processed/test/labels \
   --yolo-model ../results/yolov11_bd_signs/weights/best.pt
 ```
+
+---
+
+## 🤖 Web-LLM Integration
+
+**NEW**: AI-powered user behavior analysis with browser-based LLM!
+
+### Features
+
+- 🧠 **Browser-Based AI**: Llama-3.2 model running entirely in your browser
+- 📊 **Behavior Analytics**: Track detection patterns, model usage, and session insights
+- 💬 **Smart Chat**: Ask questions about traffic signs and get intelligent answers
+- 🔒 **Privacy-First**: All inference happens locally - no data leaves your device
+- 📈 **Session Insights**: Get AI-generated recommendations based on your usage
+
+### Quick Start
+
+```bash
+# Launch enhanced app with Web-LLM
+python web_app_llm.py
+
+# Open browser to http://localhost:7860
+# Go to "🤖 AI Chat" tab
+# Click "Load AI Model" (first time: 1-2 minutes)
+```
+
+### Example Interactions
+
+```
+You: What does the stop sign mean?
+AI: **Stop Sign** 🛑
+    Complete stop required at intersection
+    Shape: Octagon | Color: Red
+    Importance: Critical
+    
+You: How can I improve detection accuracy?
+AI: Based on your 78% avg confidence:
+    ✅ Improve lighting (40% of low-conf in dim images)
+    ✅ Try Multi-Scale for distant signs
+    ✅ Ensure signs are centered in frame
+```
+
+**Documentation**: [QUICKSTART.md](QUICKSTART.md) | [WEB_LLM_INTEGRATION.md](docs/WEB_LLM_INTEGRATION.md)
 
 ---
 
