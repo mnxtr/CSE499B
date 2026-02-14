@@ -25,6 +25,25 @@
 - 🚀 **Real-time on CPU** - 22.2 FPS without GPU acceleration  
 - 🌍 **First comprehensive BD dataset** - 8,953 images, 29 classes
 - 📱 **Production-ready** - Android app + Web demo
+- 🤖 **AI-Powered** - LLM chatbot assistant + User analytics
+
+---
+
+## 🚀 New Features: AI Assistant & Analytics
+
+### 🤖 LLM Chatbot Assistant
+- **Knowledge-Based AI**: Answers questions about traffic signs and system usage
+- **Context-Aware**: Provides relevant information based on detection results
+- **No External API**: Runs entirely locally without internet dependency
+- **Traffic Sign Database**: Detailed information about 29+ sign types
+
+### 📊 User Behavior Analytics
+- **Real-time Tracking**: Monitor detection events, model usage, and performance
+- **Session Management**: Track individual user sessions with statistics
+- **Analytics Dashboard**: Visual insights into system usage patterns
+- **SQLite Database**: Local storage with no privacy concerns
+
+**Try it:** `python web_app_llm.py`
 
 ---
 
@@ -161,11 +180,23 @@ python evaluate_models.py \
 
 ### Web Interface (Gradio)
 
+#### Basic Interface
 ```bash
 python app.py
 ```
 
+#### Enhanced Interface with AI Assistant & Analytics
+```bash
+python web_app_llm.py
+```
+
 Then open http://localhost:7860 in your browser.
+
+**New Features:**
+- 🤖 **AI Chatbot**: Ask questions about detected signs and system usage
+- 📊 **User Analytics**: Track detection events, model usage, and session statistics
+- 💬 **Chat History**: Persistent conversation tracking
+- 📈 **Analytics Dashboard**: Real-time insights into system usage
 
 ### Inference Example
 
@@ -231,6 +262,11 @@ Production-ready Android application for real-time traffic sign detection.
 ```
 bd-traffic-signs/
 ├── android-app/              # Android application
+├── backend/                  # Backend module (NEW)
+│   ├── database.py          # User analytics database
+│   ├── llm_chatbot.py       # AI assistant chatbot
+│   ├── test_backend.py      # Backend tests
+│   └── README.md            # Backend documentation
 ├── data/                     # Dataset
 │   ├── processed/           # Train/val/test splits
 │   └── raw/                 # Original images
@@ -241,7 +277,8 @@ bd-traffic-signs/
 ├── results/                  # Training outputs
 │   ├── figure_*.png        # Result figures
 │   └── yolov11_bd_signs/   # Model weights
-├── app.py                    # Gradio web demo
+├── app.py                    # Basic Gradio web demo
+├── web_app_llm.py           # Enhanced demo with AI & analytics (NEW)
 ├── requirements.txt          # Dependencies
 ├── docs/research/            # Research papers and reports
 └── README.md                 # This file
