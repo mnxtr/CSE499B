@@ -49,3 +49,7 @@ android-app/app/*.iml
 # Temporary files
 temp.html
 *.tmp
+
+# Analytics database
+analytics.db
+analytics.db-journal
