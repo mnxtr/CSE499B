@@ -1,0 +1,183 @@
+================================================================================
+      BANGLADESH TRAFFIC SIGN DETECTION - WEB-LLM & ANALYTICS ARCHITECTURE
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          USER INTERFACE (Gradio Web App)                     │
+│                                                                              │
+│  ┌────────────────────────────┐   ┌────────────────────────────────────┐  │
+│  │   Detection Interface      │   │    AI Chatbot Interface            │  │
+│  ├────────────────────────────┤   ├────────────────────────────────────┤  │
+│  │ • Upload Image             │   │ • Chat Input Field                 │  │
+│  │ • Webcam Stream            │   │ • Message History Display          │  │
+│  │ • Video Processing         │   │ • Suggested Questions              │  │
+│  │ • Model Selection          │   │ • Context-Aware Responses          │  │
+│  │   - YOLOv11                │   │                                    │  │
+│  │   - Multi-Scale            │   │ Try asking:                        │  │
+│  │   - Ensemble               │   │ "What did you detect?"             │  │
+│  │ • Confidence Threshold     │   │ "What does a stop sign mean?"      │  │
+│  │ • Detection Results        │   │ "How accurate is this system?"     │  │
+│  └────────────┬───────────────┘   └──────────────┬─────────────────────┘  │
+│               │                                    │                         │
+│  ┌────────────┴────────────────────────────────────┴──────────────────────┐ │
+│  │                        Analytics Dashboard                              │ │
+│  ├─────────────────────────────────────────────────────────────────────────┤ │
+│  │ Session Stats:                  Overall Analytics:                      │ │
+│  │ • Duration: 0:05:23             • Total Sessions: 8                     │ │
+│  │ • Frames: 45                    • Total Detections: 523                 │ │
+│  │ • Detections: 127               • Popular Model: YOLOv11                │ │
+│  │ • Avg FPS: 21.8                 • Popular Input: image                  │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │
+        ┌──────────────────────────────┴───────────────────────────────┐
+        │                                                                │
+        ▼                                                                ▼
+┌──────────────────────┐                                    ┌──────────────────┐
+│  Detection Pipeline  │                                    │   LLM Chatbot    │
+├──────────────────────┤                                    ├──────────────────┤
+│                      │                                    │                  │
+│  YOLOv11 Detector    │                                    │ Knowledge Base:  │
+│  ┌────────────────┐  │                                    │                  │
+│  │ Model: best.pt │  │                                    │ • System Info    │
+│  │ mAP: 99.45%    │  │                                    │   - Accuracy     │
+│  │ FPS: 22.2      │  │                                    │   - Speed        │
+│  │ Size: 5.2 MB   │  │                                    │   - Model Details│
+│  └────────────────┘  │                                    │                  │
+│                      │                                    │ • Traffic Signs  │
+│  Ensemble Detector   │                                    │   - 11+ types    │
+│  ┌────────────────┐  │                                    │   - Categories   │
+│  │ Multi-Scale:   │  │                                    │   - Meanings     │
+│  │ - 480px        │  │                                    │   - Actions      │
+│  │ - 640px        │  │                                    │                  │
+│  │ - 800px        │  │                                    │ • FAQ System     │
+│  │ WBF Fusion     │  │                                    │   - Usage        │
+│  └────────────────┘  │                                    │   - Models       │
+│                      │                                    │   - Performance  │
+│  Returns:            │                                    │                  │
+│  • Bounding Boxes   │                                    │ Intent Matching: │
+│  • Confidence       │                                    │ • Detection      │
+│  • Class Labels     │                                    │ • Sign Meaning   │
+│  • Inference Time   │                                    │ • System Usage   │
+└──────────┬───────────┘                                    │ • Performance    │
+           │                                                └────────┬─────────┘
+           │                                                         │
+           │   Detection Results                     Chat Response   │
+           │   {boxes, scores, labels}               {message}       │
+           │                                                         │
+           └────────────────┬───────────────────────────────────────┘
+                            │
+                            ▼
+        ┌────────────────────────────────────────────────────┐
+        │         Analytics Backend (backend/)                │
+        ├────────────────────────────────────────────────────┤
+        │                                                     │
+        │  ┌──────────────────────────────────────────────┐  │
+        │  │    Analytics Database (SQLite)               │  │
+        │  ├──────────────────────────────────────────────┤  │
+        │  │                                              │  │
+        │  │  sessions                                    │  │
+        │  │  ├─ session_id (UUID)                       │  │
+        │  │  ├─ start_time                              │  │
+        │  │  ├─ total_detections                        │  │
+        │  │  ├─ total_frames                            │  │
+        │  │  └─ avg_fps                                 │  │
+        │  │                                              │  │
+        │  │  detection_events                           │  │
+        │  │  ├─ timestamp                               │  │
+        │  │  ├─ model_type                              │  │
+        │  │  ├─ num_detections                          │  │
+        │  │  ├─ inference_time_ms                       │  │
+        │  │  ├─ fps                                     │  │
+        │  │  └─ input_type                              │  │
+        │  │                                              │  │
+        │  │  user_interactions                          │  │
+        │  │  ├─ timestamp                               │  │
+        │  │  ├─ interaction_type                        │  │
+        │  │  └─ details (JSON)                          │  │
+        │  │                                              │  │
+        │  │  chat_messages                              │  │
+        │  │  ├─ timestamp                               │  │
+        │  │  ├─ role (user/assistant)                   │  │
+        │  │  └─ message                                 │  │
+        │  │                                              │  │
+        │  └──────────────────────────────────────────────┘  │
+        │                                                     │
+        │  Operations:                                        │
+        │  • create_session()                                │
+        │  • log_detection()                                 │
+        │  • log_interaction()                               │
+        │  • log_chat_message()                              │
+        │  • get_session_stats()                             │
+        │  • get_analytics_summary()                         │
+        │  • get_detection_history()                         │
+        │  • get_chat_history()                              │
+        │                                                     │
+        └─────────────────────────────────────────────────────┘
+
+================================================================================
+                              DATA FLOW DIAGRAM
+================================================================================
+
+User Action → Web Interface → Detection/Chat Handler
+                                     │
+                    ┌────────────────┴────────────────┐
+                    │                                  │
+                    ▼                                  ▼
+             [Detection Model]                  [LLM Chatbot]
+                    │                                  │
+                    │ Results                          │ Response
+                    ▼                                  ▼
+              [Analytics DB] ←───── Logs Events ──────┘
+                    │
+                    │ Stats/History
+                    ▼
+              [Dashboard Display]
+                    │
+                    ▼
+                [User]
+
+================================================================================
+                              KEY FEATURES
+================================================================================
+
+🤖 LLM Chatbot:
+   • Knowledge-based (no external API)
+   • Context-aware responses
+   • Traffic sign information
+   • Natural language understanding
+   • Conversation history
+
+📊 Analytics:
+   • Real-time event tracking
+   • Session management
+   • Performance metrics
+   • User interaction logging
+   • Chat history
+   • Privacy-focused (local only)
+
+🌐 Web Interface:
+   • Multiple input modes
+   • Model selection
+   • Live chatbot
+   • Analytics dashboard
+   • Responsive design
+
+🔒 Privacy:
+   • All data local (SQLite)
+   • No external services
+   • No personal info collected
+   • Random session IDs
+
+================================================================================
+                           TECHNOLOGY STACK
+================================================================================
+
+Frontend:       Gradio 6.0.1 (Python-based web UI)
+Detection:      YOLOv11 (Ultralytics)
+Analytics:      SQLite3 (built-in Python)
+Chatbot:        Knowledge-based (no external LLM)
+Backend:        Python 3.12
+Dependencies:   OpenCV, NumPy, PyTorch
+
+================================================================================
