@@ -189,12 +189,13 @@ class BehaviorTracker:
     
     def get_behavior_insights(self) -> Dict[str, Any]:
         """Generate behavior insights for LLM analysis."""
+        # First get summary (which uses its own lock)
+        summary = self.get_session_summary()
+        
+        if "error" in summary:
+            return {"error": "No active session"}
+        
         with self._lock:
-            if not self.current_session:
-                return {"error": "No active session"}
-            
-            summary = self.get_session_summary()
-            
             # Calculate usage patterns
             source_distribution = {}
             for event in self.current_session.detection_events:
@@ -211,20 +212,22 @@ class BehaviorTracker:
                     action_distribution[action] = 0
                 action_distribution[action] += 1
             
-            return {
-                "summary": summary,
-                "source_distribution": source_distribution,
-                "action_distribution": action_distribution,
-                "detection_timeline": [
-                    {
-                        "time": event.timestamp,
-                        "count": event.detection_count,
-                        "model": event.model_used,
-                        "confidence": event.avg_confidence
-                    }
-                    for event in self.current_session.detection_events[-10:]  # Last 10
-                ]
-            }
+            timeline = [
+                {
+                    "time": event.timestamp,
+                    "count": event.detection_count,
+                    "model": event.model_used,
+                    "confidence": event.avg_confidence
+                }
+                for event in self.current_session.detection_events[-10:]  # Last 10
+            ]
+        
+        return {
+            "summary": summary,
+            "source_distribution": source_distribution,
+            "action_distribution": action_distribution,
+            "detection_timeline": timeline
+        }
     
     def _load_sessions(self) -> List[SessionData]:
         """Load sessions from storage."""
