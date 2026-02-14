@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web-LLM Chat Assistant</title>
+    <script type="module">
+        // Import Web-LLM from CDN
+        import * as webllm from "https://esm.run/@mlc-ai/web-llm";
+
+        let engine = null;
+        let isModelLoaded = false;
+
+        // Initialize Web-LLM
+        async function initWebLLM() {
+            const statusDiv = document.getElementById('llm-status');
+            const loadBtn = document.getElementById('load-model-btn');
+            
+            try {
+                statusDiv.textContent = '🔄 Loading Web-LLM model... This may take a few minutes on first load.';
+                loadBtn.disabled = true;
+
+                // Initialize the engine with a smaller model for better performance
+                engine = await webllm.CreateMLCEngine("Llama-3.2-1B-Instruct-q4f16_1-MLC", {
+                    initProgressCallback: (progress) => {
+                        statusDiv.textContent = `🔄 Loading: ${progress.text}`;
+                    }
+                });
+
+                isModelLoaded = true;
+                statusDiv.textContent = '✅ Web-LLM ready! You can now chat with the AI assistant.';
+                statusDiv.className = 'llm-status success';
+                
+                // Enable chat input
+                document.getElementById('user-input').disabled = false;
+                document.getElementById('send-btn').disabled = false;
+                
+                // Send initial greeting
+                await sendSystemMessage();
+                
+            } catch (error) {
+                console.error('Error loading Web-LLM:', error);
+                statusDiv.textContent = `❌ Error: ${error.message}. Try refreshing the page.`;
+                statusDiv.className = 'llm-status error';
+                loadBtn.disabled = false;
+            }
+        }
+
+        async function sendSystemMessage() {
+            const systemPrompt = `You are an AI assistant for a Bangladeshi Traffic Sign Detection System. 
+Help users understand detected traffic signs, analyze their behavior patterns, and provide insights.
+Be concise, helpful, and use emojis appropriately. Keep responses under 200 words.`;
+
+            addMessage('assistant', '👋 Hello! I\'m your AI assistant for traffic sign detection. I can help you:\n\n🚦 Understand detected traffic signs\n📊 Analyze your detection patterns\n🎯 Improve detection accuracy\n💡 Answer questions about traffic regulations\n\nHow can I help you today?');
+        }
+
+        async function sendMessage() {
+            if (!isModelLoaded) {
+                alert('Please wait for the model to load first.');
+                return;
+            }
+
+            const input = document.getElementById('user-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+
+            // Add user message to chat
+            addMessage('user', message);
+            input.value = '';
+
+            // Show typing indicator
+            const typingId = addMessage('assistant', '💭 Thinking...');
+
+            try {
+                // Get session data from backend
+                const sessionData = await fetchSessionData();
+                
+                // Create context-aware prompt
+                const contextPrompt = createContextPrompt(message, sessionData);
+                
+                // Get response from Web-LLM
+                const response = await engine.chat.completions.create({
+                    messages: [
+                        { role: "system", content: contextPrompt.system },
+                        { role: "user", content: contextPrompt.user }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 300
+                });
+
+                // Remove typing indicator
+                removeMessage(typingId);
+
+                // Add assistant response
+                const assistantMessage = response.choices[0].message.content;
+                addMessage('assistant', assistantMessage);
+
+            } catch (error) {
+                removeMessage(typingId);
+                addMessage('assistant', `❌ Error: ${error.message}. Please try again.`);
+                console.error('Chat error:', error);
+            }
+        }
+
+        function createContextPrompt(userMessage, sessionData) {
+            let context = `You are helping with traffic sign detection analysis.\n\n`;
+            
+            if (sessionData && sessionData.summary) {
+                const s = sessionData.summary;
+                context += `Current session stats:\n`;
+                context += `- Total detections: ${s.total_detections}\n`;
+                context += `- Frames processed: ${s.total_frames}\n`;
+                context += `- Average confidence: ${(s.avg_confidence * 100).toFixed(1)}%\n`;
+                context += `- Most used model: ${s.most_used_model}\n`;
+                
+                if (s.top_signs && s.top_signs.length > 0) {
+                    context += `\nTop detected signs:\n`;
+                    s.top_signs.forEach(sign => {
+                        context += `- ${sign.sign}: ${sign.count} times\n`;
+                    });
+                }
+            }
+
+            return {
+                system: context + "\nKeep responses concise and helpful. Use emojis appropriately.",
+                user: userMessage
+            };
+        }
+
+        async function fetchSessionData() {
+            try {
+                const response = await fetch('/api/session-data');
+                if (response.ok) {
+                    return await response.json();
+                }
+            } catch (error) {
+                console.error('Error fetching session data:', error);
+            }
+            return null;
+        }
+
+        function addMessage(role, content) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            const messageId = 'msg-' + Date.now();
+            messageDiv.id = messageId;
+            messageDiv.className = `message ${role}-message`;
+            
+            const avatar = role === 'user' ? '👤' : '🤖';
+            messageDiv.innerHTML = `
+                <div class="message-avatar">${avatar}</div>
+                <div class="message-content">${formatMessage(content)}</div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            return messageId;
+        }
+
+        function removeMessage(messageId) {
+            const element = document.getElementById(messageId);
+            if (element) {
+                element.remove();
+            }
+        }
+
+        function formatMessage(content) {
+            // Convert newlines to <br> and preserve formatting
+            return content.replace(/\n/g, '<br>');
+        }
+
+        async function getSessionInsights() {
+            if (!isModelLoaded) {
+                alert('Please wait for the model to load first.');
+                return;
+            }
+
+            addMessage('assistant', '📊 Analyzing your session data...');
+
+            try {
+                const sessionData = await fetchSessionData();
+                
+                if (!sessionData || !sessionData.summary) {
+                    addMessage('assistant', '⚠️ No session data available yet. Start detecting traffic signs to generate insights!');
+                    return;
+                }
+
+                const prompt = `Analyze this traffic sign detection session and provide 3-4 key insights:\n\n${JSON.stringify(sessionData.summary, null, 2)}\n\nProvide brief, actionable insights.`;
+
+                const response = await engine.chat.completions.create({
+                    messages: [
+                        { role: "system", content: "You are an AI analyst. Provide concise insights about user behavior." },
+                        { role: "user", content: prompt }
+                    ],
+                    temperature: 0.7,
+                    max_tokens: 250
+                });
+
+                addMessage('assistant', '📈 Session Insights:\n\n' + response.choices[0].message.content);
+
+            } catch (error) {
+                addMessage('assistant', `❌ Error generating insights: ${error.message}`);
+                console.error('Insights error:', error);
+            }
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('load-model-btn').addEventListener('click', initWebLLM);
+            document.getElementById('send-btn').addEventListener('click', sendMessage);
+            document.getElementById('insights-btn').addEventListener('click', getSessionInsights);
+            document.getElementById('user-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        });
+
+        // Export for use in other scripts
+        window.webLLMChat = {
+            init: initWebLLM,
+            sendMessage: sendMessage,
+            getInsights: getSessionInsights
+        };
+    </script>
+    <style>
+        .llm-chat-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .llm-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .llm-header h2 {
+            margin: 0;
+            font-size: 1.8em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .llm-status {
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            margin-bottom: 15px;
+            background: rgba(102, 126, 234, 0.1);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
+        .llm-status.success {
+            background: rgba(56, 239, 125, 0.1);
+            border-color: rgba(56, 239, 125, 0.3);
+        }
+
+        .llm-status.error {
+            background: rgba(245, 87, 108, 0.1);
+            border-color: rgba(245, 87, 108, 0.3);
+        }
+
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            display: flex;
+            margin-bottom: 15px;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-avatar {
+            font-size: 2em;
+            margin-right: 12px;
+            min-width: 40px;
+        }
+
+        .message-content {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+        }
+
+        .user-message .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-left: auto;
+        }
+
+        .assistant-message .message-content {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: inherit;
+            font-size: 14px;
+        }
+
+        .chat-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .chat-button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .chat-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .chat-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .action-button {
+            padding: 10px 20px;
+            border: 1px solid rgba(102, 126, 234, 0.5);
+            border-radius: 8px;
+            background: rgba(102, 126, 234, 0.1);
+            color: inherit;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-button:hover:not(:disabled) {
+            background: rgba(102, 126, 234, 0.2);
+            border-color: rgba(102, 126, 234, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <div class="llm-chat-container">
+        <div class="llm-header">
+            <h2>🤖 AI Assistant - Traffic Sign Analysis</h2>
+            <p style="opacity: 0.8; margin: 8px 0 0 0;">Powered by Web-LLM (runs locally in your browser)</p>
+        </div>
+
+        <div id="llm-status" class="llm-status">
+            Click "Load AI Model" to start chatting
+        </div>
+
+        <div id="chat-messages" class="chat-messages">
+            <!-- Messages will be added here dynamically -->
+        </div>
+
+        <div class="chat-input-container">
+            <input 
+                type="text" 
+                id="user-input" 
+                class="chat-input" 
+                placeholder="Ask me about traffic signs or your detection patterns..."
+                disabled
+            />
+            <button id="send-btn" class="chat-button" disabled>
+                Send
+            </button>
+        </div>
+
+        <div class="action-buttons">
+            <button id="load-model-btn" class="action-button">
+                🚀 Load AI Model
+            </button>
+            <button id="insights-btn" class="action-button" onclick="window.webLLMChat.getInsights()">
+                📊 Get Session Insights
+            </button>
+        </div>
+
+        <div style="margin-top: 15px; text-align: center; opacity: 0.7; font-size: 0.85em;">
+            💡 Tip: The AI model runs entirely in your browser. First load may take 1-2 minutes.
+        </div>
+    </div>
+</body>
+</html>
