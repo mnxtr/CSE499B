@@ -31,10 +31,10 @@ def save(path: str, rows: list[dict]) -> None:
 
 def list_jobs(rows: list[dict], status_filter: str | None) -> None:
     filtered = [r for r in rows if not status_filter or r["application_status"] == status_filter]
-    print(f"\n{'#':<5} {'Title':<40} {'Company':<30} {'Status':<15} {'Deadline'}")
+    print(f"\n{'#':<5} {'Title':<40} {'Company':<30} {'Status':<15} {'Posted'}")
     print("-" * 105)
     for i, row in enumerate(filtered, 1):
-        print(f"{i:<5} {row['title'][:38]:<40} {row['company'][:28]:<30} {row['application_status']:<15} {row['deadline']}")
+        print(f"{i:<5} {row['title'][:38]:<40} {row['company'][:28]:<30} {row['application_status']:<15} {row['posted_date']}")
     print(f"\nTotal: {len(filtered)} jobs")
 
 
