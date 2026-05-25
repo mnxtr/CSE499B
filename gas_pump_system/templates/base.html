@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Gas Pump Management{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="brand-icon">⛽</span>
+      <span class="brand-name">FuelSight</span>
+      <span class="brand-sub">Gas Pump Management System</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="/" class="{% if request.endpoint == 'index' %}active{% endif %}">Dashboard</a></li>
+      <li><a href="/transactions" class="{% if request.endpoint == 'transactions_page' %}active{% endif %}">Transactions</a></li>
+      <li><a href="/reports" class="{% if request.endpoint == 'reports_page' %}active{% endif %}">Reports</a></li>
+      <li><a href="/settings" class="{% if request.endpoint == 'settings_page' %}active{% endif %}">Settings</a></li>
+    </ul>
+    <div class="nav-status">
+      <span id="conn-indicator" class="conn-dot disconnected" title="Real-time connection"></span>
+      <span id="conn-label">Connecting…</span>
+    </div>
+  </nav>
+
+  <main class="main-content">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    const socket = io();
+    socket.on("connect",    () => setConn(true));
+    socket.on("disconnect", () => setConn(false));
+    function setConn(ok) {
+      document.getElementById("conn-indicator").className = "conn-dot " + (ok ? "connected" : "disconnected");
+      document.getElementById("conn-label").textContent = ok ? "Live" : "Offline";
+    }
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

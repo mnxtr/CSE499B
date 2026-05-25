@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Settings – FuelSight{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Station Settings</h1>
+</div>
+
+<div class="settings-grid" id="settings-grid">
+  <p class="loading-row">Loading pump settings…</p>
+</div>
+
+<div id="save-banner" class="alert-banner hidden"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadSettings() {
+  const pumps = await fetch("/api/pumps").then(r => r.json());
+  const grid  = document.getElementById("settings-grid");
+  grid.innerHTML = pumps.map(p => `
+    <div class="settings-card">
+      <h3>${p.pump_name}</h3>
+      <div class="settings-row">
+        <label>Fuel Type</label>
+        <span class="settings-val">${p.fuel_type}</span>
+      </div>
+      <div class="settings-row">
+        <label>Status</label>
+        <span class="pump-badge badge-${p.status}">${p.status.toUpperCase()}</span>
+      </div>
+      <div class="settings-row">
+        <label>Price / Gallon ($)</label>
+        <div class="price-input-row">
+          <input type="number" id="price-${p.pump_id}" value="${p.price}" step="0.001" min="0.001" class="price-input">
+          <button class="btn btn-success btn-sm" onclick="savePrice(${p.pump_id})">Save</button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <label>Maintenance Mode</label>
+        <label class="toggle">
+          <input type="checkbox" id="maint-${p.pump_id}"
+            ${p.status === 'maintenance' ? 'checked' : ''}
+            onchange="toggleMaint(${p.pump_id}, this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function savePrice(pumpId) {
+  const price = parseFloat(document.getElementById(`price-${pumpId}`).value);
+  if (!price || price <= 0) return showBanner("Invalid price", "error");
+  const r = await fetch(`/api/pumps/${pumpId}/price`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({price})
+  });
+  const d = await r.json();
+  showBanner(d.error ? d.error : `✅ Price updated to $${price.toFixed(3)}/gal`, d.error ? "error" : "success");
+}
+
+async function toggleMaint(pumpId, enabled) {
+  await fetch(`/api/pumps/${pumpId}/maintenance`, {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({enabled})
+  });
+  showBanner(enabled ? "🔧 Pump set to maintenance" : "✅ Pump back online", "info");
+}
+
+function showBanner(msg, type="info") {
+  const el = document.getElementById("save-banner");
+  el.textContent = msg;
+  el.className = `alert-banner alert-${type}`;
+  setTimeout(() => el.classList.add("hidden"), 3500);
+}
+
+loadSettings();
+</script>
+{% endblock %}
