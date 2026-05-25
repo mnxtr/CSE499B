@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Reports – FuelSight{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Revenue Reports</h1>
+  <div class="filter-bar">
+    <select id="report-hours" onchange="loadReports()">
+      <option value="24">Last 24 hours</option>
+      <option value="48">Last 48 hours</option>
+      <option value="168">Last 7 days</option>
+    </select>
+    <button class="btn btn-secondary" onclick="loadReports()">Refresh</button>
+  </div>
+</div>
+
+<div class="reports-grid">
+  <!-- KPI cards -->
+  <div class="kpi-card"><div class="kpi-label">Total Revenue</div><div class="kpi-value" id="kpi-rev">—</div></div>
+  <div class="kpi-card"><div class="kpi-label">Transactions</div><div class="kpi-value" id="kpi-txn">—</div></div>
+  <div class="kpi-card"><div class="kpi-label">Gallons Sold</div><div class="kpi-value" id="kpi-gal">—</div></div>
+  <div class="kpi-card"><div class="kpi-label">Avg Sale</div><div class="kpi-value" id="kpi-avg">—</div></div>
+</div>
+
+<div class="charts-row">
+  <div class="chart-card">
+    <h3>Hourly Revenue</h3>
+    <canvas id="hourly-chart" height="200"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Revenue by Pump</h3>
+    <canvas id="pump-chart" height="200"></canvas>
+  </div>
+</div>
+
+<div class="table-wrapper">
+  <h3>Per-Pump Breakdown</h3>
+  <table class="data-table">
+    <thead>
+      <tr><th>Pump</th><th>Fuel Type</th><th>Transactions</th><th>Gallons</th><th>Revenue</th></tr>
+    </thead>
+    <tbody id="pump-breakdown-body"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let hourlyChart = null;
+let pumpChart   = null;
+
+async function loadReports() {
+  const hours = document.getElementById("report-hours").value;
+  const [summary, byPump, hourly] = await Promise.all([
+    fetch(`/api/analytics/summary?hours=${hours}`).then(r => r.json()),
+    fetch(`/api/analytics/by-pump?hours=${hours}`).then(r => r.json()),
+    fetch(`/api/analytics/hourly?hours=${hours}`).then(r => r.json()),
+  ]);
+
+  // KPIs
+  document.getElementById("kpi-rev").textContent = `$${(summary.total_revenue||0).toFixed(2)}`;
+  document.getElementById("kpi-txn").textContent = summary.total_transactions || 0;
+  document.getElementById("kpi-gal").textContent = (summary.total_gallons||0).toFixed(3);
+  document.getElementById("kpi-avg").textContent = `$${(summary.avg_transaction||0).toFixed(2)}`;
+
+  renderHourlyChart(hourly);
+  renderPumpChart(byPump);
+  renderPumpTable(byPump);
+}
+
+function renderHourlyChart(data) {
+  const ctx = document.getElementById("hourly-chart").getContext("2d");
+  if (hourlyChart) hourlyChart.destroy();
+  hourlyChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: data.map(d => d.hour.slice(11)),
+      datasets: [{
+        label: "Revenue ($)",
+        data: data.map(d => d.revenue),
+        backgroundColor: "rgba(0,180,100,0.7)",
+        borderColor: "rgba(0,200,120,1)",
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { color: "#aaa" } }, x: { ticks: { color: "#aaa" } } }
+    }
+  });
+}
+
+function renderPumpChart(data) {
+  const ctx = document.getElementById("pump-chart").getContext("2d");
+  if (pumpChart) pumpChart.destroy();
+  pumpChart = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: data.map(d => d.pump_name),
+      datasets: [{
+        data: data.map(d => d.revenue),
+        backgroundColor: ["#00c864","#00a0e0","#f0b000","#e04040","#9060f0"],
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: "#ccc" } } }
+    }
+  });
+}
+
+function renderPumpTable(data) {
+  const tbody = document.getElementById("pump-breakdown-body");
+  tbody.innerHTML = data.map(d => `
+    <tr>
+      <td>${d.pump_name}</td>
+      <td>${d.fuel_type}</td>
+      <td>${d.transactions}</td>
+      <td>${d.gallons.toFixed(3)}</td>
+      <td class="total-col">$${d.revenue.toFixed(2)}</td>
+    </tr>`).join("");
+}
+
+socket.on("transaction_complete", loadReports);
+loadReports();
+</script>
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Dashboard – FuelSight{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Live Dashboard</h1>
+  <div class="summary-pills" id="summary-pills">
+    <div class="pill">
+      <span class="pill-label">Today's Revenue</span>
+      <span class="pill-value" id="pill-revenue">$0.00</span>
+    </div>
+    <div class="pill">
+      <span class="pill-label">Transactions</span>
+      <span class="pill-value" id="pill-txns">0</span>
+    </div>
+    <div class="pill">
+      <span class="pill-label">Gallons Sold</span>
+      <span class="pill-value" id="pill-gallons">0.000</span>
+    </div>
+    <div class="pill">
+      <span class="pill-label">Active Pumps</span>
+      <span class="pill-value" id="pill-active">0</span>
+    </div>
+  </div>
+</div>
+
+<!-- Pump cards grid -->
+<div class="pump-grid" id="pump-grid"></div>
+
+<!-- Camera modal -->
+<div id="cam-modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="cam-modal-title">Camera Feed</span>
+      <button onclick="closeCamModal()" class="btn-icon">✕</button>
+    </div>
+    <img id="cam-stream" src="" alt="Camera feed" class="cam-stream-img">
+    <div id="cam-ocr-data" class="ocr-overlay"></div>
+  </div>
+</div>
+
+<!-- Alert banner -->
+<div id="alert-banner" class="alert-banner hidden"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PUMPS = {};
+let activePumpCount = 0;
+
+// ── Fetch initial state ──────────────────────────────────────────────────────
+async function init() {
+  const [pumps, summary] = await Promise.all([
+    fetch("/api/pumps").then(r => r.json()),
+    fetch("/api/analytics/summary?hours=24").then(r => r.json()),
+  ]);
+  pumps.forEach(p => {
+    PUMPS[p.pump_id] = p;
+    renderPumpCard(p);
+  });
+  updateSummary(summary);
+}
+
+// ── Pump card rendering ──────────────────────────────────────────────────────
+function renderPumpCard(p) {
+  const grid = document.getElementById("pump-grid");
+  let card = document.getElementById(`pump-card-${p.pump_id}`);
+  if (!card) {
+    card = document.createElement("div");
+    card.id = `pump-card-${p.pump_id}`;
+    card.className = "pump-card";
+    grid.appendChild(card);
+  }
+  card.className = `pump-card status-${p.status}`;
+  const gallons = (p.gallons || 0).toFixed(3);
+  const total   = (p.total   || 0).toFixed(2);
+  const price   = (p.price   || 0).toFixed(3);
+  const hasTxn  = !!p.txn_id;
+
+  card.innerHTML = `
+    <div class="pump-card-header">
+      <span class="pump-name">${p.pump_name}</span>
+      <span class="pump-badge badge-${p.status}">${p.status.toUpperCase()}</span>
+    </div>
+    <div class="pump-fuel-type">${p.fuel_type}</div>
+    <div class="pump-display">
+      <div class="display-row">
+        <span class="display-label">GALLONS</span>
+        <span class="display-value" id="gal-${p.pump_id}">${gallons}</span>
+      </div>
+      <div class="display-row">
+        <span class="display-label">PRICE/GAL</span>
+        <span class="display-value">$${price}</span>
+      </div>
+      <div class="display-row total-row">
+        <span class="display-label">TOTAL</span>
+        <span class="display-value total-value" id="total-${p.pump_id}">$${total}</span>
+      </div>
+    </div>
+    <div class="pump-actions">
+      ${hasTxn
+        ? `<button class="btn btn-danger" onclick="stopTxn(${p.pump_id})">Stop & Pay</button>`
+        : `<button class="btn btn-success" onclick="startTxn(${p.pump_id})"
+              ${p.status === 'maintenance' || p.status === 'offline' ? 'disabled' : ''}>
+             Start Fueling
+           </button>`
+      }
+      <button class="btn btn-secondary" onclick="openCam(${p.pump_id})">📷 Camera</button>
+      <button class="btn btn-ghost" onclick="toggleMaintenance(${p.pump_id}, ${p.status !== 'maintenance'})">
+        ${p.status === 'maintenance' ? '✅ Clear' : '🔧 Maint.'}
+      </button>
+    </div>
+  `;
+}
+
+// ── API helpers ──────────────────────────────────────────────────────────────
+async function startTxn(pumpId) {
+  const r = await fetch(`/api/pumps/${pumpId}/start`, { method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({payment_method: "card"}) });
+  const d = await r.json();
+  if (d.error) showAlert(d.error, "error");
+}
+
+async function stopTxn(pumpId) {
+  const r = await fetch(`/api/pumps/${pumpId}/stop`, { method: "POST" });
+  const d = await r.json();
+  if (d.error) { showAlert(d.error, "error"); return; }
+  showAlert(`✅ Transaction complete — ${d.gallons_dispensed?.toFixed(3)} gal · $${d.total_cost?.toFixed(2)}`, "success");
+  refreshSummary();
+}
+
+async function toggleMaintenance(pumpId, enable) {
+  await fetch(`/api/pumps/${pumpId}/maintenance`, { method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({enabled: enable}) });
+}
+
+function openCam(pumpId) {
+  const p = PUMPS[pumpId] || {};
+  document.getElementById("cam-modal-title").textContent = `${p.pump_name || "Pump"} – Camera Feed`;
+  document.getElementById("cam-stream").src = `/video/${pumpId}?t=${Date.now()}`;
+  document.getElementById("cam-modal").classList.remove("hidden");
+}
+function closeCamModal() {
+  document.getElementById("cam-stream").src = "";
+  document.getElementById("cam-modal").classList.add("hidden");
+}
+
+// ── Real-time ────────────────────────────────────────────────────────────────
+socket.on("init",      d => d.pumps.forEach(p => { PUMPS[p.pump_id] = p; renderPumpCard(p); }));
+socket.on("pump_update", p => { PUMPS[p.pump_id] = p; renderPumpCard(p); });
+socket.on("pump_reading", d => {
+  const gEl = document.getElementById(`gal-${d.pump_id}`);
+  const tEl = document.getElementById(`total-${d.pump_id}`);
+  if (gEl) gEl.textContent = (d.gallons || 0).toFixed(3);
+  if (tEl) tEl.textContent = `$${(d.total || 0).toFixed(2)}`;
+  activePumpCount = Object.values(PUMPS).filter(p => p.status === "active").length;
+  document.getElementById("pill-active").textContent = activePumpCount;
+});
+socket.on("transaction_complete", () => refreshSummary());
+
+// ── Summary refresh ──────────────────────────────────────────────────────────
+async function refreshSummary() {
+  const s = await fetch("/api/analytics/summary?hours=24").then(r => r.json());
+  updateSummary(s);
+}
+
+function updateSummary(s) {
+  document.getElementById("pill-revenue").textContent = `$${(s.total_revenue||0).toFixed(2)}`;
+  document.getElementById("pill-txns").textContent    = s.total_transactions || 0;
+  document.getElementById("pill-gallons").textContent = (s.total_gallons||0).toFixed(3);
+}
+
+// ── Alert banner ─────────────────────────────────────────────────────────────
+function showAlert(msg, type="info") {
+  const el = document.getElementById("alert-banner");
+  el.textContent = msg;
+  el.className = `alert-banner alert-${type}`;
+  setTimeout(() => el.classList.add("hidden"), 4000);
+}
+
+setInterval(refreshSummary, 30000);
+init();
+</script>
+{% endblock %}

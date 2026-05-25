@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Transactions – FuelSight{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Transaction History</h1>
+  <div class="filter-bar">
+    <select id="filter-pump" onchange="loadTxns()">
+      <option value="">All Pumps</option>
+    </select>
+    <select id="filter-hours" onchange="loadTxns()">
+      <option value="24">Last 24 hours</option>
+      <option value="48">Last 48 hours</option>
+      <option value="168">Last 7 days</option>
+      <option value="">All time</option>
+    </select>
+    <button class="btn btn-secondary" onclick="loadTxns()">Refresh</button>
+  </div>
+</div>
+
+<div class="table-wrapper">
+  <table class="data-table" id="txn-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Pump</th>
+        <th>Fuel</th>
+        <th>Started</th>
+        <th>Ended</th>
+        <th>Gallons</th>
+        <th>$/Gal</th>
+        <th>Total</th>
+        <th>Payment</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="txn-body">
+      <tr><td colspan="10" class="loading-row">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function populatePumpFilter() {
+  const pumps = await fetch("/api/pumps").then(r => r.json());
+  const sel   = document.getElementById("filter-pump");
+  pumps.forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.pump_id;
+    opt.textContent = p.pump_name;
+    sel.appendChild(opt);
+  });
+}
+
+async function loadTxns() {
+  const pumpId = document.getElementById("filter-pump").value;
+  const hours  = document.getElementById("filter-hours").value;
+  let url = `/api/transactions?limit=200`;
+  if (pumpId) url += `&pump_id=${pumpId}`;
+  if (hours)  url += `&hours=${hours}`;
+  const txns = await fetch(url).then(r => r.json());
+  renderTable(txns);
+}
+
+function renderTable(txns) {
+  const tbody = document.getElementById("txn-body");
+  if (!txns.length) {
+    tbody.innerHTML = `<tr><td colspan="10" class="loading-row">No transactions found.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = txns.map(t => {
+    const start   = t.start_time ? new Date(t.start_time).toLocaleString() : "—";
+    const end     = t.end_time   ? new Date(t.end_time).toLocaleString()   : "In progress";
+    const status  = t.payment_status;
+    const statusCls = status === "completed" ? "badge-idle" : status === "pending" ? "badge-active" : "badge-maintenance";
+    return `
+      <tr>
+        <td>${t.id}</td>
+        <td>${t.pump_name || t.pump_id}</td>
+        <td>${t.fuel_type}</td>
+        <td>${start}</td>
+        <td>${end}</td>
+        <td>${(t.gallons_dispensed||0).toFixed(3)}</td>
+        <td>$${(t.price_per_gallon||0).toFixed(3)}</td>
+        <td class="total-col">$${(t.total_cost||0).toFixed(2)}</td>
+        <td>${t.payment_method}</td>
+        <td><span class="pump-badge ${statusCls}">${status}</span></td>
+      </tr>`;
+  }).join("");
+}
+
+socket.on("transaction_complete", loadTxns);
+
+populatePumpFilter().then(loadTxns);
+</script>
+{% endblock %}
